@@ -7,7 +7,7 @@ Gem::Specification.new do |spec|
   spec.name          = "carrousel"
   spec.version       = Carrousel::VERSION
   spec.authors       = ["Raj Sahae"]
-  spec.email         = ["rsahae@teslamotors.com"]
+  spec.email         = ["rajsahae@gmail.com"]
   spec.description   = %q{Carrousel is a robust utility designed to take a list
   of generic items, and given some command, perform that command on each item
   in that list. Depending on the commands return value, Carrousel will track 
