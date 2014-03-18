@@ -50,7 +50,6 @@ module Carrousel
             @incomplete.rotate!
           end
         ensure
-          warn "Saving status file" if @opts[:verbose]
           save_status_file
         end
       end # until @incomplete.empty?
@@ -58,9 +57,10 @@ module Carrousel
 
     private
     def generate_status_filename
-      key = Digest::SHA256.hexdigest(@incomplete.sort.join)
+      key = Digest::SHA256.hexdigest(@incomplete.sort.join).slice(0...7)
       warn "status filename key:#{key}" if @opts[:debug]
-      File.expand_path("pleat_status_#{key}", Dir.pwd)
+      name = self.class.name.gsub('::', '_').downcase
+      File.expand_path(".#{name}_status_#{key}", Dir.pwd)
     end # def generate_status_filename
 
     private
@@ -68,14 +68,17 @@ module Carrousel
       if File.exists?(@opts[:statusfile])
         dbs = YAML.load(File.read(@opts[:statusfile]))
         warn "YAML status file:#{dbs}" if @opts[:debug]
-        @opts[:command] ||= dbs[:command]
-        @complete.concat(dbs[:complete])
-        @incomplete.concat(dbs[:incomplete])
+        if dbs
+          @opts[:command] ||= dbs[:command]
+          @complete.concat(dbs[:complete])
+          @incomplete.concat(dbs[:incomplete])
+        end
       end
     end # def open_status_file
 
     private
     def save_status_file
+      warn "Saving status file:#{@opts[:statusfile]}" if @opts[:verbose]
       File.open(@opts[:statusfile], 'w') do |f|
         ydb = {
           :command => @opts[:command],
