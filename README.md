@@ -1,6 +1,9 @@
 # Carrousel
 
-TODO: Write a gem description
+The Carrousel gem is a command line utility for running a single command on
+multiple targets. Carrousel tracks which commands have succeeded or failed
+based on the return of the system call, and sends failed jobs to the back of
+the line to be tried again later.
 
 ## Installation
 
@@ -18,7 +21,34 @@ Or install it yourself as:
 
 ## Usage
 
-TODO: Write usage instructions here
+The most basic use case for Carrousel is to give it a command and a list of
+items as command line arguments:
+
+  carrousel -c 'echo' foo bar baz
+
+In addition to passing in arguments on the command line, you can also pass them
+in a file. These will be in addition to anything on the command line:
+
+  carrousel -c 'echo' -l things-to-echo.txt foo bar baz
+
+While running, carrousel will track it's progress in a carrousel runner status
+file. This file is stored in the present working directory. If you need to kill
+carrousel for any reason, you can pick up where you left off by passing the
+status file into carrousel. The status file will save your completed items,
+incompleted items, and the command used. The file will always be of the form
+~/PWD/.carrousel\_runner\_status\_XXXXXXX. The following example kills the echo
+carrousel and resumes it using a carrousel runner status file:
+
+  carrousel -c 'echo' foo bar baz
+  ... CTRL-C to kill this for some reason ...
+  carrousel -s .carrousel\_runner\_status\_130b02b
+
+If you would like there to be some sort of delay between individual jobs, you
+can specify that with a delay argument. The following example inserts a 30
+second delay between each echo command:
+
+  carrousel -c 'echo' --delay 30 foo bar baz
+  
 
 ## Contributing
 
