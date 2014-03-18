@@ -5,27 +5,27 @@ require 'optparse'
 
 @opts = {}
 OptionParser.new do |op|
-  op.banner = "Usage: #{__FILE__} [options] [command] [item1 item2 ...]"
+  op.banner = "Usage: #{__FILE__} [options] -c COMMAND arg1 [arg2 ...]"
 
-  op.on('-v', '--[no-]verbose', 'Run verbosely') do |v|
-    @opts[:verbose] = v
-  end
-
-  op.on('-c', '--command COMMAND', 'Command to execute') do |c|
+  op.on('-c', '--command COMMAND', 'Execute the given COMMAND') do |c|
     @opts[:command] = c
   end
 
-  op.on('-l', '--listfile FILE', 'File containing list of items') do |l|
+  op.on('-l', '--listfile FILE', 'Load list of arguments from FILE') do |l|
     @opts[:listfile] = File.expand_path(l)
+  end
+
+  op.on('-s', '--statusfile FILE', 'Replay FILE with saved command and args') do |s|
+    @opts[:statusfile] = File.expand_path(s)
+  end
+
+  op.on('-v', '--[no-]verbose', 'Enable verbose output') do |v|
+    @opts[:verbose] = v
   end
 
   op.on('--[no-]debug', 'Enable debug output') do |d|
     @opts[:debug] = d
     @opts[:verbose] ||= d
-  end
-
-  op.on('-s' '--statusfile FILE', 'File with previously saved status') do |s|
-    @opts[:statusfile] = File.expand_path(s)
   end
 end.parse!
 

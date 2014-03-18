@@ -30,7 +30,7 @@ module Carrousel
 
       p self if @opts[:debug]
 
-      raise ArgumentError.new("Missing command argument") if @opts[:command].nil?
+      raise ArgumentError.new("Command option is required") if @opts[:command].nil?
     end # def initialize
 
     def run
@@ -41,9 +41,10 @@ module Carrousel
       # normal list, and we ensure that we write out the completed list.
       until @incomplete.empty?
         begin
-          warn "Executing command:#{@opts[:command]} with arg:#{@incomplete.first}" if @opts[:verbose]
-          resp = system([@opts[:command], @incomplete.first].join(' '))
-          warn "System response:#{resp}" if @opts[:verbose]
+          command = [@opts[:command], @incomplete.first].join(' ')
+          warn "Executing command: #{command}" if @opts[:verbose]
+          resp = system(command)
+          warn "System response: #{resp}" if @opts[:verbose]
           if resp
             @complete << @incomplete.delete(@incomplete.first)
           else
@@ -58,7 +59,7 @@ module Carrousel
     private
     def generate_status_filename
       key = Digest::SHA256.hexdigest(@incomplete.sort.join).slice(0...7)
-      warn "status filename key:#{key}" if @opts[:debug]
+      warn "status file key: #{key}" if @opts[:debug]
       name = self.class.name.gsub('::', '_').downcase
       File.expand_path(".#{name}_status_#{key}", Dir.pwd)
     end # def generate_status_filename
@@ -67,7 +68,7 @@ module Carrousel
     def open_status_file
       if File.exists?(@opts[:statusfile])
         dbs = YAML.load(File.read(@opts[:statusfile]))
-        warn "YAML status file:#{dbs}" if @opts[:debug]
+        warn "opened status file:\n#{dbs}" if @opts[:debug]
         if dbs
           @opts[:command] ||= dbs[:command]
           @complete.concat(dbs[:complete])
@@ -78,16 +79,16 @@ module Carrousel
 
     private
     def save_status_file
-      warn "Saving status file:#{@opts[:statusfile]}" if @opts[:verbose]
+      warn "Saving status file: #{@opts[:statusfile]}" if @opts[:verbose]
       File.open(@opts[:statusfile], 'w') do |f|
         ydb = {
           :command => @opts[:command],
           :complete => @complete,
           :incomplete => @incomplete
         }.to_yaml
-        warn "YAML status file:#{ydb}" if @opts[:debug]
         f.puts(ydb)
       end
+      warn "Saved status file:\n#{ydb}" if @opts[:debug]
       true
     end # def save_status_file
 
