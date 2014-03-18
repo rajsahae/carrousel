@@ -53,6 +53,11 @@ module Carrousel
         ensure
           save_status_file
         end
+
+        if @opts[:delay] > 0
+          warn "Sleeping for #{@opts[:delay]} seconds" if @opts[:verbose]
+          sleep @opts[:delay]
+        end
       end # until @incomplete.empty?
     end # def run
 
@@ -87,8 +92,8 @@ module Carrousel
           :incomplete => @incomplete
         }.to_yaml
         f.puts(ydb)
+        warn "Saved status file:\n#{ydb}" if @opts[:debug]
       end
-      warn "Saved status file:\n#{ydb}" if @opts[:debug]
       true
     end # def save_status_file
 

@@ -11,6 +11,10 @@ OptionParser.new do |op|
     @opts[:command] = c
   end
 
+  op.on('-d', '--delay DELAY', 'Sleep for DELAY seconds between commands') do |d|
+    @opts[:delay] = d.to_i
+  end
+
   op.on('-l', '--listfile FILE', 'Load list of arguments from FILE') do |l|
     @opts[:listfile] = File.expand_path(l)
   end
@@ -30,10 +34,11 @@ OptionParser.new do |op|
 end.parse!
 
 @opts = {
-  :verbose => false,
   :command => nil,
+  :delay => 0,
   :listfile => nil,
   :statusfile => nil,
+  :verbose => false,
   :debug => false
 }.merge(@opts)
 
