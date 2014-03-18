@@ -15,7 +15,7 @@ Gem::Specification.new do |spec|
   It will save your progress in a status database and you can quit the loop 
   and come back later to finish unprocessed items.}
   spec.summary       = %q{Robust list based action tracking utility.}
-  spec.homepage      = ""
+  spec.homepage      = "https://github.com/rajsahae/carrousel"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files`.split($/)
