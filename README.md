@@ -41,7 +41,7 @@ carrousel and resumes it using a carrousel runner status file:
 
     $ carrousel -c 'echo' foo bar baz
     ... CTRL-C to kill this for some reason ...
-    $ carrousel -s .carrousel\_runner\_status\_130b02b
+    $ carrousel -s .carrousel_runner_status_130b02b
 
 If you would like there to be some sort of delay between individual jobs, you
 can specify that with a delay argument. The following example inserts a 30
