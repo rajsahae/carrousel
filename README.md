@@ -1,6 +1,7 @@
 # Carrousel
 
 [![Gem Version](https://badge.fury.io/rb/carrousel.png)](http://badge.fury.io/rb/carrousel)
+[![carrousel API Documentation](https://www.omniref.com/ruby/gems/carrousel.png)](https://www.omniref.com/ruby/gems/carrousel)
 
 The Carrousel gem is a command line utility for running a single command on
 multiple targets. Carrousel tracks which commands have succeeded or failed
