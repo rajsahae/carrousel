@@ -11,6 +11,10 @@ OptionParser.new do |op|
     @opts[:command] = c
   end
 
+  op.on('-j', '--jobs N', 'Allow N jobs at one time') do |n|
+    @opts[:maxjobs] = n.to_i
+  end
+
   op.on('-d', '--delay DELAY', 'Sleep for DELAY seconds between commands') do |d|
     @opts[:delay] = d.to_i
   end

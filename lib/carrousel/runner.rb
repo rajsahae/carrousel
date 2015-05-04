@@ -22,6 +22,8 @@ module Carrousel
       incomplete = []
       complete   = []
 
+      warn @opts.inspect if @opts[:debug]
+
       unless @opts[:listfile].nil?
         lines = File.readlines(@opts[:listfile]).map(&:strip)
         incomplete.concat(lines)
