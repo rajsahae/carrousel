@@ -3,6 +3,7 @@
 
 require 'digest'
 require 'yaml'
+require 'yaml/store'
 
 ##
 # "Enter the Carrousel. This is the time of renewal."
@@ -70,30 +71,31 @@ module Carrousel
 
     private
     def open_status_file
-      if File.exists?(@opts[:statusfile])
-        dbs = YAML.load(File.read(@opts[:statusfile]))
-        warn "opened status file:\n#{dbs}" if @opts[:debug]
-        if dbs
-          @opts[:command] ||= dbs[:command]
-          @complete.concat(dbs[:complete])
-          @incomplete.concat(dbs[:incomplete])
+      resume = File.exists?(@opts[:statusfile])
+      @store = YAML::Store.new @opts[:statusfile]
+      warn "opened status file: #{@store.path}" if @opts[:debug]
+
+      if resume
+        @store.transaction(true) do # read-only transaction
+          @opts[:command] ||= @store[:command]
+          @complete.concat(@store[:complete])
+          @incomplete.concat(@store[:incomplete])
         end
       end
+
     end # def open_status_file
 
     private
     def save_status_file
-      warn "Saving status file: #{@opts[:statusfile]}" if @opts[:verbose]
-      File.open(@opts[:statusfile], 'w') do |f|
-        ydb = {
-          :command => @opts[:command],
-          :complete => @complete,
-          :incomplete => @incomplete
-        }.to_yaml
-        f.puts(ydb)
-        warn "Saved status file:\n#{ydb}" if @opts[:debug]
+      warn "Saving status file: #{@store.path}" if @opts[:verbose]
+
+      @store.transaction do
+        @store[:command]    = @opts[:command]
+        @store[:complete]   = @complete
+        @store[:incomplete] = @incomplete
       end
-      true
+
+      warn "Saved status file: #{@store.path}" if @opts[:debug]
     end # def save_status_file
 
   end # class Runner
