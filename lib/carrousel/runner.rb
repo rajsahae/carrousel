@@ -14,21 +14,28 @@ module Carrousel
   class Runner
 
     def initialize(args, opts = {})
-      @args = args
-      @opts = opts
-      @incomplete = []
-      @complete = []
+      @args      = args
+      @opts      = opts
+
+      @threads   = []
+
+      incomplete = []
+      complete   = []
 
       unless @opts[:listfile].nil?
         lines = File.readlines(@opts[:listfile]).map(&:strip)
-        @incomplete.concat(lines)
+        incomplete.concat(lines)
       end
-      @incomplete.concat(@args)
+      incomplete.concat(@args)
 
-      @opts[:statusfile] ||= generate_status_filename
-      open_status_file
+      warn "incomplete after cli parse: #{incomplete}" if @opts[:debug]
+      warn "complete after cli parse: #{complete}"   if @opts[:debug]
 
-      p self if @opts[:debug]
+      @opts[:statusfile] ||= generate_status_filename(incomplete.sort.join + Time.now.to_s)
+      open_status_file(incomplete, complete)
+
+      warn "incomplete after statusfile parse: #{incomplete}" if @opts[:debug]
+      warn "complete after statusfile parse: #{complete}"     if @opts[:debug]
 
       raise ArgumentError.new("Command option is required") if @opts[:command].nil?
     end # def initialize
@@ -39,64 +46,103 @@ module Carrousel
       # succeeds, we move the item to the completed list. If we are interrupted
       # in the middle of processing, we ensure that the item is saved in the
       # normal list, and we ensure that we write out the completed list.
-      until @incomplete.empty?
-        begin
-          command = [@opts[:command], @incomplete.first].join(' ')
-          warn "Executing command: #{command}" if @opts[:verbose]
-          resp = system(command)
-          warn "System response: #{resp}" if @opts[:verbose]
-          if resp
-            @complete << @incomplete.delete(@incomplete.first)
+
+      begin
+
+        until @store.transaction(true) { @store[:incomplete].empty? && @store[:processing].empty? }
+
+          if @threads.size < @opts[:maxjobs]
+            target = nil
+            @store.transaction do
+              target = @store[:incomplete].delete_at(0)
+              @store[:processing].push(target)
+            end
+            warn 'store file content' if @opts[:debug]
+            warn File.read(@store.path) if @opts[:debug]
+            warn "creating new job for target: #{target}" if @opts[:debug]
+            create_new_job(target)
           else
-            @incomplete.rotate!
+            if @opts[:delay] > 0
+              warn "Sleeping for #{@opts[:delay]} seconds" if @opts[:verbose]
+              sleep @opts[:delay]
+            end
           end
-        ensure
-          save_status_file
+
         end
 
-        if @opts[:delay] > 0
-          warn "Sleeping for #{@opts[:delay]} seconds" if @opts[:verbose]
-          sleep @opts[:delay]
-        end
-      end # until @incomplete.empty?
-    end # def run
-
-    private
-    def generate_status_filename
-      key = Digest::SHA256.hexdigest(@incomplete.sort.join).slice(0...7)
-      warn "status file key: #{key}" if @opts[:debug]
-      name = self.class.name.gsub('::', '_').downcase
-      File.expand_path(".#{name}_status_#{key}", Dir.pwd)
-    end # def generate_status_filename
-
-    private
-    def open_status_file
-      resume = File.exists?(@opts[:statusfile])
-      @store = YAML::Store.new @opts[:statusfile]
-      warn "opened status file: #{@store.path}" if @opts[:debug]
-
-      if resume
-        @store.transaction(true) do # read-only transaction
-          @opts[:command] ||= @store[:command]
-          @complete.concat(@store[:complete])
-          @incomplete.concat(@store[:incomplete])
-        end
+      ensure
+        save_status_file
       end
 
-    end # def open_status_file
+    end
 
     private
-    def save_status_file
-      warn "Saving status file: #{@store.path}" if @opts[:verbose]
+    def create_new_job(target)
+      command = [@opts[:command], target].join(' ')
+      warn "Executing command: #{command}" if @opts[:verbose]
+      resp = system(command)
+      warn "System response: #{resp}" if @opts[:verbose]
 
       @store.transaction do
-        @store[:command]    = @opts[:command]
-        @store[:complete]   = @complete
-        @store[:incomplete] = @incomplete
+
+        @store[:processing].delete(target)
+
+        if resp
+          @store[:complete] << target
+        else
+          @store[:incomplete] << target
+        end
+
       end
 
-      warn "Saved status file: #{@store.path}" if @opts[:debug]
-    end # def save_status_file
+  end # def run
 
-  end # class Runner
+  private
+  def generate_status_filename(string)
+    key = Digest::SHA256.hexdigest(string).slice(0...7)
+    warn "status file key: #{key}" if @opts[:debug]
+    name = self.class.name.gsub('::', '_').downcase
+    File.expand_path(".#{name}_status_#{key}", Dir.pwd)
+  end # def generate_status_filename
+
+  private
+  def open_status_file(incomplete, complete)
+    resume = File.exists?(@opts[:statusfile])
+    @store = YAML::Store.new @opts[:statusfile]
+    warn "opened status file: #{@store.path}" if @opts[:debug]
+
+    @store.transaction do
+      @store[:processing] = []
+    end
+
+    warn "resuming: #{resume}"
+
+    if resume
+      @store.transaction(true) do # read-only transaction
+        @opts[:command] ||= @store[:command]
+        @store[:incomplete].concat(incomplete)
+        @store[:complete].concat(complete)
+      end
+    else
+      @store.transaction do
+        @store[:incomplete] = incomplete
+        @store[:complete]   = complete
+      end
+    end
+
+  end # def open_status_file
+
+  private
+  def save_status_file
+    warn "Saving status file: #{@store.path}" if @opts[:verbose]
+
+    @store.transaction do
+      @store[:incomplete].concat(@store[:processing])
+      @store[:processing].clear
+    end
+
+    warn "Saved status file: #{@store.path}" if @opts[:debug]
+  end # def save_status_file
+
+end # class Runner
 end # module Carrousel
