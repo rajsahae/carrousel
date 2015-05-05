@@ -110,6 +110,7 @@ module Carrousel
 
         @store[:pids].delete(Process.pid)
 
+        warn "Removing pid from queue: #{Process.pid}" if @opts[:debug]
         warn "Num jobs: #{@store[:pids].size} Current jobs: #{@store[:pids]}" if @opts[:debug]
       end
 
