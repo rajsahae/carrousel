@@ -17,8 +17,6 @@ module Carrousel
       @args      = args
       @opts      = opts
 
-      @threads   = []
-
       incomplete = []
       complete   = []
 
@@ -53,23 +51,36 @@ module Carrousel
 
         until @store.transaction(true) { @store[:incomplete].empty? && @store[:processing].empty? }
 
-          if @threads.size < @opts[:maxjobs]
-            target = nil
-            @store.transaction do
-              target = @store[:incomplete].delete_at(0)
-              @store[:processing].push(target)
-            end
-            warn 'store file content' if @opts[:debug]
-            warn File.read(@store.path) if @opts[:debug]
-            warn "creating new job for target: #{target}" if @opts[:debug]
-            create_new_job(target)
-          else
-            if @opts[:delay] > 0
-              warn "Sleeping for #{@opts[:delay]} seconds" if @opts[:verbose]
-              sleep @opts[:delay]
-            end
-          end
+          until @store.transaction(true) { @store[:incomplete].empty? }
 
+            if @opts[:debug]
+              @store.transaction(false) { 
+                warn "Current jobs: #{@store[:pids]} <#{@store[:pids].size}>" if @opts[:debug]
+              }
+            end
+
+            if @store.transaction(true) { @store[:pids].size < @opts[:maxjobs] }
+              target = nil
+              @store.transaction do
+                target = @store[:incomplete].delete_at(0)
+                @store[:processing].push(target)
+              end
+
+              warn "creating new job for target: #{target}" if @opts[:debug]
+              pid = Process.fork { create_new_job(target) }
+              warn "Forked job: #{pid}" if @opts[:debug]
+
+              @store.transaction do
+                @store[:pids].push(pid)
+              end
+            else
+              if @opts[:delay] > 0
+                warn "Sleeping for #{@opts[:delay]} seconds" if @opts[:debug]
+                sleep @opts[:delay]
+              end
+            end
+
+          end
         end
 
       ensure
@@ -80,10 +91,14 @@ module Carrousel
 
     private
     def create_new_job(target)
+      warn 'store file content' if @opts[:debug]
+      warn File.read(@store.path) if @opts[:debug]
+
+      sleep 1 # Make sure we don't try to access @store before the PID has been pushed from the main process
       command = [@opts[:command], target].join(' ')
-      warn "Executing command: #{command}" if @opts[:verbose]
+      warn "<#{target}> Executing command: #{command}" if @opts[:verbose]
       resp = system(command)
-      warn "System response: #{resp}" if @opts[:verbose]
+      warn "<#{target}> System response: #{resp}" if @opts[:verbose]
 
       @store.transaction do
 
@@ -95,56 +110,65 @@ module Carrousel
           @store[:incomplete] << target
         end
 
+        @store[:pids].delete(Process.pid)
+
       end
 
-  end # def run
+    end # def run
 
-  private
-  def generate_status_filename(string)
-    key = Digest::SHA256.hexdigest(string).slice(0...7)
-    warn "status file key: #{key}" if @opts[:debug]
-    name = self.class.name.gsub('::', '_').downcase
-    File.expand_path(".#{name}_status_#{key}", Dir.pwd)
-  end # def generate_status_filename
+    private
+    def generate_status_filename(string)
+      key = Digest::SHA256.hexdigest(string).slice(0...7)
+      warn "status file key: #{key}" if @opts[:debug]
+      name = self.class.name.gsub('::', '_').downcase
+      File.expand_path(".#{name}_status_#{key}", Dir.pwd)
+    end # def generate_status_filename
 
-  private
-  def open_status_file(incomplete, complete)
-    resume = File.exists?(@opts[:statusfile])
-    @store = YAML::Store.new @opts[:statusfile]
-    warn "opened status file: #{@store.path}" if @opts[:debug]
+    private
+    def open_status_file(incomplete, complete)
+      resume = File.exists?(@opts[:statusfile])
+      @store = YAML::Store.new @opts[:statusfile]
+      warn "opened status file: #{@store.path}" if @opts[:debug]
 
-    @store.transaction do
-      @store[:processing] = []
-    end
-
-    warn "resuming: #{resume}"
-
-    if resume
-      @store.transaction(true) do # read-only transaction
-        @opts[:command] ||= @store[:command]
-        @store[:incomplete].concat(incomplete)
-        @store[:complete].concat(complete)
-      end
-    else
       @store.transaction do
-        @store[:incomplete] = incomplete
-        @store[:complete]   = complete
+        @store[:processing] = []
+        @store[:pids] = []
       end
-    end
 
-  end # def open_status_file
+      warn "resuming: #{resume}" if @opts[:debug]
 
-  private
-  def save_status_file
-    warn "Saving status file: #{@store.path}" if @opts[:verbose]
+      if resume
+        @store.transaction(true) do # read-only transaction
+          @opts[:command] ||= @store[:command]
+          @store[:incomplete].concat(incomplete)
+          @store[:complete].concat(complete)
+        end
+      else
+        @store.transaction do
+          @store[:command]    = @opts[:command]
+          @store[:incomplete] = incomplete
+          @store[:complete]   = complete
+        end
+      end
 
-    @store.transaction do
-      @store[:incomplete].concat(@store[:processing])
-      @store[:processing].clear
-    end
+    end # def open_status_file
 
-    warn "Saved status file: #{@store.path}" if @opts[:debug]
-  end # def save_status_file
+    private
+    def save_status_file
 
-end # class Runner
+      @store.transaction do
+        @store[:pids].each do |process|
+          warn "Killing #{process}" if @opts[:debug]
+          Process.kill('KILL', process)
+        end
+
+        @store[:incomplete].concat(@store[:processing])
+        @store.delete(:processing)
+        @store.delete(:pids)
+      end
+
+      warn "Saved status file: #{@store.path}" if @opts[:debug]
+    end # def save_status_file
+
+  end # class Runner
 end # module Carrousel
