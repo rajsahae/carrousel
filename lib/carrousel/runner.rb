@@ -4,6 +4,7 @@
 require 'digest'
 require 'yaml'
 require 'yaml/store'
+require 'proc/wait3'
 
 ##
 # "Enter the Carrousel. This is the time of renewal."
@@ -12,6 +13,8 @@ require 'yaml/store'
 module Carrousel
 
   class Runner
+
+    CONTINUE_SIGNAL = 25
 
     def initialize(args, opts = {})
       @args      = args
@@ -53,12 +56,6 @@ module Carrousel
 
           until @store.transaction(true) { @store[:incomplete].empty? }
 
-            if @opts[:debug]
-              @store.transaction(false) { 
-                warn "Current jobs: #{@store[:pids]} <#{@store[:pids].size}>" if @opts[:debug]
-              }
-            end
-
             if @store.transaction(true) { @store[:pids].size < @opts[:maxjobs] }
               target = nil
               @store.transaction do
@@ -72,12 +69,14 @@ module Carrousel
 
               @store.transaction do
                 @store[:pids].push(pid)
+                warn "Num jobs: #{@store[:pids].size} Current jobs: #{@store[:pids]}" if @opts[:debug]
               end
-            else
-              if @opts[:delay] > 0
-                warn "Sleeping for #{@opts[:delay]} seconds" if @opts[:debug]
-                sleep @opts[:delay]
-              end
+
+              warn "Detaching #{pid}" if @opts[:debug]
+              Process.detach(pid) # We don't plan to monitor these  
+
+              warn "Sending continue signal to #{pid}" if @opts[:debug]
+              Process.kill(CONTINUE_SIGNAL, pid)
             end
 
           end
@@ -91,17 +90,16 @@ module Carrousel
 
     private
     def create_new_job(target)
-      warn 'store file content' if @opts[:debug]
-      warn File.read(@store.path) if @opts[:debug]
+      warn "<#{target}> Job created. Pausing #{Process.pid}" if @opts[:debug]
+      Process.pause(CONTINUE_SIGNAL)
+      warn "<#{target}> Resuming job #{Process.pid}" if @opts[:debug]
 
-      sleep 1 # Make sure we don't try to access @store before the PID has been pushed from the main process
       command = [@opts[:command], target].join(' ')
       warn "<#{target}> Executing command: #{command}" if @opts[:verbose]
       resp = system(command)
       warn "<#{target}> System response: #{resp}" if @opts[:verbose]
 
       @store.transaction do
-
         @store[:processing].delete(target)
 
         if resp
@@ -112,6 +110,7 @@ module Carrousel
 
         @store[:pids].delete(Process.pid)
 
+        warn "Num jobs: #{@store[:pids].size} Current jobs: #{@store[:pids]}" if @opts[:debug]
       end
 
     end # def run
