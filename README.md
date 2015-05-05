@@ -46,11 +46,30 @@ carrousel and resumes it using a carrousel runner status file:
     ... CTRL-C to kill this for some reason ...
     $ carrousel -s .carrousel_runner_status_130b02b
 
-If you would like there to be some sort of delay between individual jobs, you
-can specify that with a delay argument. The following example inserts a 30
-second delay between each echo command:
 
-    $ carrousel -c 'echo' --delay 30 foo bar baz
+Finally, you can run jobs concurrently with the '-j' option:
+
+    $ carrousel -c "ruby -e 'sleep ARGV.first.to_i'" 10 1 9 2 8 3 7 4 6 5 --verbose -j3
+    <10> Executing command: ruby -e 'sleep ARGV.first.to_i' 10
+    <1> Executing command: ruby -e 'sleep ARGV.first.to_i' 1
+    <9> Executing command: ruby -e 'sleep ARGV.first.to_i' 9
+    <1> System response: true
+    <2> Executing command: ruby -e 'sleep ARGV.first.to_i' 2
+    <2> System response: true
+    <8> Executing command: ruby -e 'sleep ARGV.first.to_i' 8
+    <9> System response: true
+    <3> Executing command: ruby -e 'sleep ARGV.first.to_i' 3
+    <10> System response: true
+    <7> Executing command: ruby -e 'sleep ARGV.first.to_i' 7
+    <8> System response: true
+    <4> Executing command: ruby -e 'sleep ARGV.first.to_i' 4
+    <3> System response: true
+    <6> Executing command: ruby -e 'sleep ARGV.first.to_i' 6
+    <4> System response: true
+    <5> Executing command: ruby -e 'sleep ARGV.first.to_i' 5
+    <7> System response: true
+    <6> System response: true
+    <5> System response: true
   
 
 ## Contributing
