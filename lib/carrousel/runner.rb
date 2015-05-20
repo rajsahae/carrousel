@@ -14,7 +14,7 @@ module Carrousel
 
   class Runner
 
-    CONTINUE_SIGNAL = 25
+    CONTINUE_SIGNAL = 25 # SIGCONT
 
     def initialize(args, opts = {})
       @args      = args
